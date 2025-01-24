@@ -28,7 +28,17 @@ pip install -i https://gmsh.info/python-packages-dev --force-reinstall --no-cach
 Run the script:
 
 ```bash
-python scripts/create_mesh.py
+python scripts/create_mesh.py ~/Downloads/many_magnets.iges --output_file ~/Downloads/many_magnets.msh
+```
+
+If you need to save a big file to a network drive, then it's much faster to move the file after it has been generated
+```bash
+python scripts/create_mesh.py ~/Downloads/many_magnets.iges --output_file /tmp/many_magnets.msh --refinement_factor 0.05 && mv /tmp/many_magnets.msh /Volumes/Users/Craig/Elmer/Meshes/many_magnets.msh
+```
+
+```bash
+# see options with
+python scripts/create_mesh.py --help
 ```
 
 Run tests:

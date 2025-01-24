@@ -12,8 +12,8 @@ def main():
         parser = argparse.ArgumentParser(description="Generate a mesh from an input IGES file.")
         parser.add_argument("input_file", type=str, help="Path to the input IGES file.")
         parser.add_argument(
-            "--air_mesh_size", type=float, default=8.0,
-            help="Default element size for the air volume where it is not near bodies (default: 8.0)."
+            "--air_mesh_size", type=float, default=0,
+            help="Default element size for the air volume where it is not near bodies (default: calculated automatically based on the total air volume)."
         )
         parser.add_argument(
             "--refinement_factor", type=float, default=0.1,
@@ -54,11 +54,19 @@ def main():
         gmsh.model.occ.importShapes(input_file)
         gmsh.model.occ.synchronize()
 
+        # Remove duplicate entities
+        duplicates = gmsh.model.occ.removeAllDuplicates()
+        print("Duplicates:", duplicates)
+        gmsh.model.occ.synchronize()
+
         # Check the imported volumes
         object_volumes = gmsh.model.getEntities(dim=3)
         if not object_volumes:
             raise ValueError("No volumes found in the IGES file.")
         print("Imported volumes:", object_volumes)
+
+        # Set tolerances to avoid self-intersections
+        gmsh.option.setNumber("Geometry.ToleranceBoolean", 1e-6)
 
         # Fetch surface tags of the imported geometry (before adding the air volume)
         object_surfaces = gmsh.model.getEntities(dim=2)
@@ -76,6 +84,10 @@ def main():
         xmax += air_box_padding
         ymax += air_box_padding
         zmax += air_box_padding
+
+        if air_mesh_size == 0:
+            air_mesh_size = round(((xmax - xmin) + (ymax - ymin) + (zmax - zmin)) / 100)
+            print("Air mesh size automatically set to:", air_mesh_size)
 
         # Define the air volume as a box
         air_volume = gmsh.model.occ.addBox(xmin, ymin, zmin, xmax - xmin, ymax - ymin, zmax - zmin)
