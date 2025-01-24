@@ -1,33 +1,57 @@
-import gmsh
 import os
-import shutil
-
-# Input IGES file path
-INPUT_IGES_FILE = "data/two_magnets.iges"
-
-# Output mesh file path
-OUTPUT_MESH_FILE = "data/output.msh"
-# Final file is copied to the output directory (faster to copy the final file if the target is a network drive)
-TARGET_MESH_FILE = "/Volumes/Users/Craig/Elmer/Meshes/two_magnets.msh"
-
-# Mesh parameters
-AIR_BOX_PADDING = 50.0  # Padding around the geometry
-TARGET_MESH_SIZE = 4.0  # Default element size
-REFINEMENT_FACTOR = 0.1  # Refinement near bodies
-REFINE_DIST_MIN = 2.0  # Minimum distance for refinement
-REFINE_DIST_MAX = 10.0  # Minimum distance for refinement
+import argparse
+import gmsh
 
 def main():
-    # Initialize Gmsh
-    gmsh.initialize()
-    gmsh.option.setNumber("General.Terminal", 1)
-
     try:
-        if not os.path.exists(INPUT_IGES_FILE):
-            raise FileNotFoundError(f"Input IGES file not found: {INPUT_IGES_FILE}")
+        # Initialize Gmsh
+        gmsh.initialize()
+        gmsh.option.setNumber("General.Terminal", 1)
+
+        # ---------------- Parse Arguments ----------------
+        parser = argparse.ArgumentParser(description="Generate a mesh from an input IGES file.")
+        parser.add_argument("input_file", type=str, help="Path to the input IGES file.")
+        parser.add_argument(
+            "--air_mesh_size", type=float, default=4.0,
+            help="Default element size for the air volume where it is not near bodies (default: 4.0)."
+        )
+        parser.add_argument(
+            "--refinement_factor", type=float, default=0.1,
+            help="Refinement factor for the mesh near bodies, if your model is in MM and target mesh size is 4mm, a value of 0.1 will result in a mash of 0.4mm (default: 0.1)."
+        )
+        parser.add_argument(
+            "--air_box_padding", type=float, default=20.0,
+            help="Padding around the geometry for the air volume (default: 20.0)."
+        )
+        parser.add_argument(
+            "--refine_dist_min", type=float, default=2.0,
+            help="The distance from body surfaces where the mesh starts to become less refined (default: 2.0)."
+        )
+        parser.add_argument(
+            "--refine_dist_max", type=float, default=10.0,
+            help="The distance from body surfaces where the mesh fidelity will be back at the air_mesh_size value (default: 10.0)."
+        )
+        parser.add_argument(
+            "--output_file", type=str, default="final_mesh.msh",
+            help="Path to the output mesh file (default: final_mesh.msh)."
+        )
+        args = parser.parse_args()
+
+        air_box_padding = args.air_box_padding
+        input_file = args.input_file
+        output_file = args.output_file
+        air_mesh_size = args.air_mesh_size
+        refinement_factor = args.refinement_factor
+        refine_dist_min = args.refine_dist_min
+        refine_dist_max = args.refine_dist_max
+        # --------------------------------------------------
+
+
+        if not os.path.exists(input_file):
+            raise FileNotFoundError(f"Input IGES file not found: {input_file}")
 
         # Load the IGES file
-        gmsh.model.occ.importShapes(INPUT_IGES_FILE)
+        gmsh.model.occ.importShapes(input_file)
         gmsh.model.occ.synchronize()
 
         # Check the imported volumes
@@ -46,12 +70,12 @@ def main():
         print("Bounding box dimensions:", xmin, xmax, ymin, ymax, zmin, zmax)
 
         # Create air volume
-        xmin -= AIR_BOX_PADDING
-        ymin -= AIR_BOX_PADDING
-        zmin -= AIR_BOX_PADDING
-        xmax += AIR_BOX_PADDING
-        ymax += AIR_BOX_PADDING
-        zmax += AIR_BOX_PADDING
+        xmin -= air_box_padding
+        ymin -= air_box_padding
+        zmin -= air_box_padding
+        xmax += air_box_padding
+        ymax += air_box_padding
+        zmax += air_box_padding
 
         # Define the air volume as a box
         air_volume = gmsh.model.occ.addBox(xmin, ymin, zmin, xmax - xmin, ymax - ymin, zmax - zmin)
@@ -92,10 +116,10 @@ def main():
         # Define a threshold field
         threshold_field_tag = gmsh.model.mesh.field.add("Threshold")
         gmsh.model.mesh.field.setNumber(threshold_field_tag, "InField", distance_field_tag)
-        gmsh.model.mesh.field.setNumber(threshold_field_tag, "SizeMin", TARGET_MESH_SIZE * REFINEMENT_FACTOR)
-        gmsh.model.mesh.field.setNumber(threshold_field_tag, "SizeMax", TARGET_MESH_SIZE)
-        gmsh.model.mesh.field.setNumber(threshold_field_tag, "DistMin", REFINE_DIST_MIN)
-        gmsh.model.mesh.field.setNumber(threshold_field_tag, "DistMax", REFINE_DIST_MAX)
+        gmsh.model.mesh.field.setNumber(threshold_field_tag, "SizeMin", air_mesh_size * refinement_factor)
+        gmsh.model.mesh.field.setNumber(threshold_field_tag, "SizeMax", air_mesh_size)
+        gmsh.model.mesh.field.setNumber(threshold_field_tag, "DistMin", refine_dist_min)
+        gmsh.model.mesh.field.setNumber(threshold_field_tag, "DistMax", refine_dist_max)
 
         # Apply the field as the background mesh field
         gmsh.model.mesh.field.setAsBackgroundMesh(threshold_field_tag)
@@ -104,27 +128,14 @@ def main():
         gmsh.model.mesh.generate(3)
 
         # Save the mesh
-        gmsh.write(OUTPUT_MESH_FILE)
-        print(f"Mesh saved to {OUTPUT_MESH_FILE}")
+        gmsh.write(output_file)
+        print(f"Mesh saved to {output_file}")
 
     except Exception as e:
         print(f"Error: {e}")
 
     finally:
         gmsh.finalize()
-
-        # Copy the file
-        try:
-            print(f"Copying file to {TARGET_MESH_FILE}")
-            shutil.copy(OUTPUT_MESH_FILE, TARGET_MESH_FILE)
-            print(f"File copied from {OUTPUT_MESH_FILE} to {TARGET_MESH_FILE}")
-        except FileNotFoundError:
-            print(f"The file {OUTPUT_MESH_FILE} does not exist.")
-        except PermissionError:
-            print("Permission denied. Unable to copy the file.")
-        except Exception as e:
-            print(f"An error occurred: {e}")
-
 
 if __name__ == "__main__":
     main()
