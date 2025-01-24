@@ -12,16 +12,16 @@ def main():
         parser = argparse.ArgumentParser(description="Generate a mesh from an input IGES file.")
         parser.add_argument("input_file", type=str, help="Path to the input IGES file.")
         parser.add_argument(
-            "--air_mesh_size", type=float, default=4.0,
-            help="Default element size for the air volume where it is not near bodies (default: 4.0)."
+            "--air_mesh_size", type=float, default=8.0,
+            help="Default element size for the air volume where it is not near bodies (default: 8.0)."
         )
         parser.add_argument(
             "--refinement_factor", type=float, default=0.1,
-            help="Refinement factor for the mesh near bodies, if your model is in MM and target mesh size is 4mm, a value of 0.1 will result in a mash of 0.4mm (default: 0.1)."
+            help="Refinement factor for the mesh near bodies, if your model is in MM and target mesh size is 4mm, a value of 0.1 will result in a mesh of 0.4mm (default: 0.1)."
         )
         parser.add_argument(
-            "--air_box_padding", type=float, default=20.0,
-            help="Padding around the geometry for the air volume (default: 20.0)."
+            "--air_box_padding", type=float, default=100.0,
+            help="Padding around the geometry for the air volume (default: 100.0)."
         )
         parser.add_argument(
             "--refine_dist_min", type=float, default=2.0,
@@ -128,8 +128,9 @@ def main():
         gmsh.model.mesh.generate(3)
 
         # Save the mesh
+        print(f"Saving to {output_file}")
         gmsh.write(output_file)
-        print(f"Mesh saved to {output_file}")
+        print(f"Mesh saved")
 
     except Exception as e:
         print(f"Error: {e}")
