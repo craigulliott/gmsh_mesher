@@ -52,3 +52,39 @@ pytest tests/
 The resulting mesh from this software can be used to run a simulation in Elmer, here is a great video showing how to set that up
 
 https://www.youtube.com/watch?v=_b0NPP12OCQ
+
+### Notes for Running Magneto-Dynamic (MgDyn) Simulations with Elmer
+
+These insights are the result of extensive trial and error over several days and are specifically geared toward using Gmsh to generate meshes for running Magneto-Dynamic (MgDyn) simulations in Elmer.
+
+#### Key Learnings
+
+1. **Mesh Quality is Critical**
+
+   - Elmer is highly sensitive to the quality of the mesh. If your convergence history chart does not quickly trend downward (a red line starting at 1 and dropping to 1e-07 or lower within a few iterations), the mesh is likely the issue.
+
+2. **Mesh Refinement**
+
+   - The mesh should be most refined near your geometry and can become coarser toward the edges of the air volume. While it's common to refine only near features (e.g., vertices), I found that making the mesh uniform across the faces of objects yielded results that were easier to interpret.
+
+3. **Air Volume Considerations**
+
+   - **Size**: Ensure the air volume surrounding your geometry is very large. A large air volume reduces solver errors and provides better visualization capabilities with GUI tools.
+   - **Overlap**: The air volume must **not** overlap with your bodies. Overlapping geometries caused significant issues in my workflow. The most effective approach to avoid this was to generate the air volume and subtract the bodies from it within my Python scripts.
+
+4. **Mesh Optimization**
+
+   - Utilizing the `Optimize` and `OptimizeNetgen` steps in Gmsh was crucial. Skipping these steps often led to mesh errors and poor simulation results.
+
+5. **Platform Compatibility**
+
+   - Running these simulations on a silicon-based Mac proved to be a significant challenge. After numerous unsuccessful attempts, I found that switching to a PC was the most practical solution.
+
+#### Additional Tips
+- Expect to iterate on your mesh design and simulation setup multiple times before achieving optimal results.
+- Keep an eye on the solver logs and convergence charts for signs of issues early in the simulation process.
+- Familiarize yourself with Python scripting in Gmsh to streamline and automate repetitive tasks, such as air volume creation and mesh refinement.
+- Running Elmer with multiple threads is straightforward and massively reduces simulation time. Make sure to configure the number of threads to match your hardware capabilities for optimal performance.
+- Start with small and simple meshes. Early in my process, I encountered many frustrating issues due to the size and complexity of my meshes, as well as the extended time required for processing. By starting with smaller, simpler meshes, I was able to better understand and fine-tune the parameters. Once I had a solid grasp of the workflow, both Gmsh and Elmer handled larger, more complex models efficiently and effectively.
+
+These notes are intended to help others avoid the same pitfalls and save valuable time when running MgDyn simulations with Elmer. If you encounter similar challenges or have additional insights, contributions are welcome!
