@@ -33,7 +33,7 @@ python scripts/create_mesh.py ~/Downloads/many_magnets.iges --output_file ~/Down
 
 If you need to save a big file to a network drive, then it's much faster to move the file after it has been generated
 ```bash
-python scripts/create_mesh.py ~/Downloads/many_magnets.iges --output_file /tmp/many_magnets.msh --refinement_factor 0.05 && mv /tmp/many_magnets.msh /Volumes/Users/Craig/Elmer/Meshes/many_magnets.msh
+python scripts/create_mesh.py ~/Downloads/many_magnets.iges --output_file /tmp/many_magnets.msh --refinement_factor 0.05 && mv /tmp/many_magnets.msh /Volumes/Users/Craig/Elmer/Projects/many_magnets/mesh.msh
 ```
 
 ```bash
@@ -46,3 +46,9 @@ Run tests:
 ```bash
 pytest tests/
 ```
+
+## Elmer
+
+The resulting mesh from this software can be used to run a simulation in Elmer, here is a great video showing how to set that up
+
+https://www.youtube.com/watch?v=_b0NPP12OCQ

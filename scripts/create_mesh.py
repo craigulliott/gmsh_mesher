@@ -9,26 +9,26 @@ def main():
         gmsh.option.setNumber("General.Terminal", 1)
 
         # ---------------- Parse Arguments ----------------
-        parser = argparse.ArgumentParser(description="Generate a mesh from an input IGES file.")
-        parser.add_argument("input_file", type=str, help="Path to the input IGES file.")
+        parser = argparse.ArgumentParser(description="Generate a mesh from an input STEP/IGES file.")
+        parser.add_argument("input_file", type=str, help="Path to the input STEP/IGES file.")
         parser.add_argument(
             "--air_mesh_size", type=float, default=0,
             help="Default element size for the air volume where it is not near bodies (default: calculated automatically based on the total air volume)."
         )
         parser.add_argument(
-            "--refinement_factor", type=float, default=0.1,
-            help="Refinement factor for the mesh near bodies, if your model is in MM and target mesh size is 4mm, a value of 0.1 will result in a mesh of 0.4mm (default: 0.1)."
+            "--refinement_factor", type=float, default=0.01,
+            help="Refinement factor for the mesh near bodies, if your model is in MM and target mesh size is 4mm, a value of 0.1 will result in a mesh of 0.4mm (default: 0.01)."
         )
         parser.add_argument(
-            "--air_box_padding", type=float, default=100.0,
-            help="Padding around the geometry for the air volume (default: 100.0)."
+            "--air_box_padding", type=float, default=400.0,
+            help="Padding around the geometry for the air volume (default: 400.0)."
         )
         parser.add_argument(
-            "--refine_dist_min", type=float, default=2.0,
+            "--refine_dist_min", type=float, default=4.0,
             help="The distance from body surfaces where the mesh starts to become less refined (default: 2.0)."
         )
         parser.add_argument(
-            "--refine_dist_max", type=float, default=10.0,
+            "--refine_dist_max", type=float, default=40.0,
             help="The distance from body surfaces where the mesh fidelity will be back at the air_mesh_size value (default: 10.0)."
         )
         parser.add_argument(
@@ -48,25 +48,47 @@ def main():
 
 
         if not os.path.exists(input_file):
-            raise FileNotFoundError(f"Input IGES file not found: {input_file}")
+            raise FileNotFoundError(f"Input STEP/IGES file not found: {input_file}")
 
-        # Load the IGES file
+        print("Default number of threads used:", gmsh.option.getNumber("General.NumThreads"))
+        cores = os.cpu_count()
+        print(f"Number of logical processors (cores) on this machine: {cores}")
+        if cores > 2:
+            gmsh.option.setNumber("General.NumThreads", cores - 1)
+            print(f"Number of threads set to {cores - 1}")
+
+        # Load the STEP/IGES file
         gmsh.model.occ.importShapes(input_file)
         gmsh.model.occ.synchronize()
 
         # Remove duplicate entities
         duplicates = gmsh.model.occ.removeAllDuplicates()
         print("Duplicates:", duplicates)
+        if duplicates:
+            raise ValueError("Duplicates found in the STEP/IGES file.")
         gmsh.model.occ.synchronize()
 
         # Check the imported volumes
         object_volumes = gmsh.model.getEntities(dim=3)
         if not object_volumes:
-            raise ValueError("No volumes found in the IGES file.")
+            raise ValueError("No volumes found in the STEP/IGES file.")
         print("Imported volumes:", object_volumes)
 
         # Set tolerances to avoid self-intersections
         gmsh.option.setNumber("Geometry.ToleranceBoolean", 1e-6)
+
+        # Use 2nd-order elements to capture field gradients more accurately.
+        # Disabled until we figure out how to configure elmer to handle them
+        # gmsh.option.setNumber("Mesh.ElementOrder", 2)
+
+        # Enable mesh optimization to reduce skewness and improve element shapes
+        gmsh.option.setNumber("Mesh.Optimize", 1)
+        gmsh.option.setNumber("Mesh.OptimizeNetgen", 1)  # Advanced Netgen optimization
+
+        # Set the default meshing algorithm and element order
+        # 7 = Frontal-Delaunay (3D)
+        # 9 = HXT (highly optimized for multithreading)
+        gmsh.option.setNumber("Mesh.Algorithm3D", 1)
 
         # Fetch surface tags of the imported geometry (before adding the air volume)
         object_surfaces = gmsh.model.getEntities(dim=2)
@@ -86,8 +108,12 @@ def main():
         zmax += air_box_padding
 
         if air_mesh_size == 0:
-            air_mesh_size = round(((xmax - xmin) + (ymax - ymin) + (zmax - zmin)) / 100)
+            air_mesh_size = round(((xmax - xmin) + (ymax - ymin) + (zmax - zmin)) / 40)
             print("Air mesh size automatically set to:", air_mesh_size)
+
+        size_min = air_mesh_size * refinement_factor
+        print("Most detailed mesh size automatically set to:", size_min)
+
 
         # Define the air volume as a box
         air_volume = gmsh.model.occ.addBox(xmin, ymin, zmin, xmax - xmin, ymax - ymin, zmax - zmin)
@@ -128,7 +154,7 @@ def main():
         # Define a threshold field
         threshold_field_tag = gmsh.model.mesh.field.add("Threshold")
         gmsh.model.mesh.field.setNumber(threshold_field_tag, "InField", distance_field_tag)
-        gmsh.model.mesh.field.setNumber(threshold_field_tag, "SizeMin", air_mesh_size * refinement_factor)
+        gmsh.model.mesh.field.setNumber(threshold_field_tag, "SizeMin", size_min)
         gmsh.model.mesh.field.setNumber(threshold_field_tag, "SizeMax", air_mesh_size)
         gmsh.model.mesh.field.setNumber(threshold_field_tag, "DistMin", refine_dist_min)
         gmsh.model.mesh.field.setNumber(threshold_field_tag, "DistMax", refine_dist_max)
