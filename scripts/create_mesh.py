@@ -16,8 +16,8 @@ def main():
             help="Default element size for the air volume where it is not near bodies (default: calculated automatically based on the total air volume)."
         )
         parser.add_argument(
-            "--refinement_factor", type=float, default=0.01,
-            help="Refinement factor for the mesh near bodies, if your model is in MM and target mesh size is 4mm, a value of 0.1 will result in a mesh of 0.4mm (default: 0.01)."
+            "--refinement_factor", type=float, default=0.05,
+            help="Refinement factor for the mesh near bodies, if your model is in MM and target mesh size is 4mm, a value of 0.1 will result in a mesh of 0.4mm (default: 0.05)."
         )
         parser.add_argument(
             "--air_box_padding", type=float, default=400.0,
@@ -82,7 +82,7 @@ def main():
         # gmsh.option.setNumber("Mesh.ElementOrder", 2)
 
         # Enable mesh optimization to reduce skewness and improve element shapes
-        gmsh.option.setNumber("Mesh.Optimize", 1)
+        gmsh.option.setNumber("Mesh.Optimize", 3) # 3 passes
         gmsh.option.setNumber("Mesh.OptimizeNetgen", 1)  # Advanced Netgen optimization
 
         # Set the default meshing algorithm and element order
