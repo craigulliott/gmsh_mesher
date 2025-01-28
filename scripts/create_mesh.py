@@ -87,8 +87,8 @@ def main():
             help="Default element size in MM for the air volume where it is not near bodies (default: calculated automatically based on the total air volume)."
         )
         parser.add_argument(
-            "--refinement_factor", type=float, default=0.025,
-            help="Refinement factor for the mesh near bodies, if your model is in MM and target mesh size is 4mm, a value of 0.1 will result in a mesh of 0.4mm (default: 0.025)."
+            "--refinement_factor", type=float, default=0.02,
+            help="Refinement factor for the mesh near bodies, if your model is in MM and target mesh size is 4mm, a value of 0.1 will result in a mesh of 0.4mm (default: 0.02)."
         )
         parser.add_argument(
             "--air_box_padding", type=float, default=400.0,
@@ -127,18 +127,18 @@ def main():
         if args.draft:
             # a less fine mesh is desired
             print("Draft mode enabled")
-            auto_air_mesh_factor = 30
+            auto_air_mesh_factor = 20
 
         elif args.fine:
             # a very fine mesh is desired
             print("Fine mode enabled")
             auto_air_mesh_factor = 70
             # override (unless its been set manually)
-            if args.refinement_factor == 0.025:
+            if args.refinement_factor == 0.02:
                 refinement_factor = 0.015
 
         else:
-            auto_air_mesh_factor = 60
+            auto_air_mesh_factor = 50
 
         # --------------------------------------------------
 
@@ -189,7 +189,7 @@ def main():
 
             # Print the new bounding box of the geometry
             scaled_xmin, scaled_ymin, scaled_zmin, scaled_xmax, scaled_ymax, scaled_zmax = gmsh.model.getBoundingBox(-1, -1)
-            print(f"New bounding box dimensions (meters): x {scaled_xmin:.2f}, {scaled_xmax:.2f}, y {scaled_ymin:.2f}, {scaled_ymax:.2f}, z {scaled_zmin:.2f}, {scaled_zmax:.2f}")
+            print(f"New bounding box dimensions (meters): x {scaled_xmin:.4f}, {scaled_xmax:.4f}, y {scaled_ymin:.4f}, {scaled_ymax:.4f}, z {scaled_zmin:.4f}, {scaled_zmax:.4f}")
 
         print("Default number of threads used:", gmsh.option.getNumber("General.NumThreads"))
         cores = os.cpu_count()
@@ -250,10 +250,10 @@ def main():
         # calculate a sane default for air_mesh_size (unless one was provided)
         if air_mesh_size == 0:
             air_mesh_size = round(((xmax - xmin) + (ymax - ymin) + (zmax - zmin)) / auto_air_mesh_factor, 5)
-            print(f"Air mesh size automatically set to {air_mesh_size:.5f} m ({air_mesh_size * 1000} mm):", )
+            print(f"Air mesh size automatically set to {air_mesh_size:.5f} m ({(air_mesh_size * 1000):.2f} mm):", )
 
         size_min = round(air_mesh_size * refinement_factor, 5)
-        print(f"Most detailed mesh size automatically set to {size_min:.5f} m ({size_min * 1000} mm):", )
+        print(f"Most detailed mesh size automatically set to {size_min:.5f} m ({(size_min * 1000):.2f} mm):", )
 
         print(f"Final value for air_box_padding: {air_box_padding} m ({air_box_padding * 1000} mm)")
         print(f"Final value for air_mesh_size: {air_mesh_size} m ({air_mesh_size * 1000} mm)")
@@ -272,17 +272,15 @@ def main():
 
         # Cut the geometry from the air volume
         print("Object volume tags:", object_volumes)
-        air_volume_cut = gmsh.model.occ.cut(
+        air_volume_cut = gmsh.model.occ.fragment(
             [(3, air_volume)],
-            [(3, tag) for tag in [v[1] for v in object_volumes]],
-            removeObject=True,
-            removeTool=False
+            [(3, tag) for tag in [v[1] for v in object_volumes]]
         )
         gmsh.model.occ.synchronize()
-        print("Air volume cut result:", air_volume_cut)
+        print("Air volume fragment result:", air_volume_cut)
 
         remaining_volumes = gmsh.model.getEntities(dim=3)
-        print("Remaining volumes after cut:", remaining_volumes)
+        print("Remaining volumes after fragment:", remaining_volumes)
 
         # Add physical groups for volumes
         for volume in remaining_volumes:
