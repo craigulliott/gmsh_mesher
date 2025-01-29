@@ -231,21 +231,32 @@ def main():
         # 9 = HXT (highly optimized for multithreading)
         gmsh.option.setNumber("Mesh.Algorithm3D", 1)
 
+        # Get the bounding box of the geometry
+        xmin, ymin, zmin, xmax, ymax, zmax = gmsh.model.getBoundingBox(-1, -1)
+
+        print(f"Moving geometry so that none of the study will fall in a negative quadrant")
+        air_vol_xmin = xmin - air_box_padding
+        air_vol_ymin = ymin - air_box_padding
+        air_vol_zmin = zmin - air_box_padding
+        x_offset = -air_vol_xmin if air_vol_xmin < 0 else 0
+        y_offset = -air_vol_ymin if air_vol_ymin < 0 else 0
+        z_offset = -air_vol_zmin if air_vol_zmin < 0 else 0
+
+        gmsh.model.occ.translate([(3, tag) for tag in [v[1] for v in object_volumes]], x_offset, y_offset, z_offset)
+        gmsh.model.occ.synchronize()
+
         # Fetch surface tags of the imported geometry (before adding the air volume)
         object_surfaces = gmsh.model.getEntities(dim=2)
         surface_tags = [s[1] for s in object_surfaces]
         print("Object surface tags:", surface_tags)
 
-        # Get the bounding box of the geometry
-        xmin, ymin, zmin, xmax, ymax, zmax = gmsh.model.getBoundingBox(-1, -1)
-
         # Create air volume
-        xmin -= air_box_padding
-        ymin -= air_box_padding
-        zmin -= air_box_padding
-        xmax += air_box_padding
-        ymax += air_box_padding
-        zmax += air_box_padding
+        xmin = 0
+        ymin = 0
+        zmin = 0
+        xmax += (2 * air_box_padding)
+        ymax += (2 * air_box_padding)
+        zmax += (2 * air_box_padding)
 
         # calculate a sane default for air_mesh_size (unless one was provided)
         if air_mesh_size == 0:
@@ -265,18 +276,6 @@ def main():
         gmsh.model.occ.synchronize()
 
         print("Air volume tag:", air_volume)
-
-        # Print the bounding box of the geometry
-        air_vol_xmin, air_vol_ymin, air_vol_zmin, air_vol_xmax, air_vol_ymax, air_vol_zmax = gmsh.model.getBoundingBox(-1, -1)
-        print(f"Bounding box dimensions with Air Volume (meters): x {air_vol_xmin:.2f}, {air_vol_xmax:.2f}, y {air_vol_ymin:.2f}, {air_vol_ymax:.2f}, z {air_vol_zmin:.2f}, {air_vol_zmax:.2f}")
-
-        print(f"Moving geometry to the 0,0 origin so that none of the study falls in a negative quadrant")
-        x_offset = -air_vol_xmin
-        y_offset = -air_vol_ymin
-        z_offset = -air_vol_zmin
-        gmsh.model.occ.translate([(3, air_volume)], x_offset, y_offset, z_offset)
-        gmsh.model.occ.translate([(3, tag) for tag in [v[1] for v in object_volumes]], x_offset, y_offset, z_offset)
-        gmsh.model.occ.synchronize()
 
         # Print the final bounding box of the geometry
         final_xmin, final_ymin, final_zmin, final_xmax, final_ymax, final_zmax = gmsh.model.getBoundingBox(-1, -1)
@@ -307,9 +306,6 @@ def main():
         # Create a mesh size field for refinement near the bodies
         distance_field_tag = gmsh.model.mesh.field.add("Distance")
         gmsh.model.mesh.field.setNumbers(distance_field_tag, "SurfacesList", surface_tags)
-
-        for volume in remaining_volumes:
-            gmsh.model.addPhysicalGroup(3, [volume[1]])
 
         # Define a threshold field
         threshold_field_tag = gmsh.model.mesh.field.add("Threshold")
