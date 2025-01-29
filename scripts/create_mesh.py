@@ -266,9 +266,21 @@ def main():
 
         print("Air volume tag:", air_volume)
 
-        # Get the bounding box of the geometry
+        # Print the bounding box of the geometry
+        air_vol_xmin, air_vol_ymin, air_vol_zmin, air_vol_xmax, air_vol_ymax, air_vol_zmax = gmsh.model.getBoundingBox(-1, -1)
+        print(f"Bounding box dimensions with Air Volume (meters): x {air_vol_xmin:.2f}, {air_vol_xmax:.2f}, y {air_vol_ymin:.2f}, {air_vol_ymax:.2f}, z {air_vol_zmin:.2f}, {air_vol_zmax:.2f}")
+
+        print(f"Moving geometry to the 0,0 origin so that none of the study falls in a negative quadrant")
+        x_offset = -air_vol_xmin
+        y_offset = -air_vol_ymin
+        z_offset = -air_vol_zmin
+        gmsh.model.occ.translate([(3, air_volume)], x_offset, y_offset, z_offset)
+        gmsh.model.occ.translate([(3, tag) for tag in [v[1] for v in object_volumes]], x_offset, y_offset, z_offset)
+        gmsh.model.occ.synchronize()
+
+        # Print the final bounding box of the geometry
         final_xmin, final_ymin, final_zmin, final_xmax, final_ymax, final_zmax = gmsh.model.getBoundingBox(-1, -1)
-        print(f"Bounding box dimensions with Air Volume (meters): x {final_xmin:.2f}, {final_xmax:.2f}, y {final_ymin:.2f}, {final_ymax:.2f}, z {final_zmin:.2f}, {final_zmax:.2f}")
+        print(f"Final bounding box dimensions with Air Volume (meters): x {final_xmin:.2f}, {final_xmax:.2f}, y {final_ymin:.2f}, {final_ymax:.2f}, z {final_zmin:.2f}, {final_zmax:.2f}")
 
         # Cut the geometry from the air volume
         print("Object volume tags:", object_volumes)
