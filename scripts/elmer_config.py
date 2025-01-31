@@ -6,19 +6,29 @@ import re
 def name_to_material(name):
     cases = {
         r"^Shapes/air": 1,
-        r"^Shapes/magnet_1_0_0": 2,
-        r"^Shapes/magnet_-1_0_0": 3,
-        r"^Shapes/magnet_0_1_0": 4,
-        r"^Shapes/magnet_0_-1_0": 5,
-        r"^Shapes/magnet_0_0_1": 6,
-        r"^Shapes/magnet_0_0_-1": 7,
-        r"^Shapes/iron": 8,
+        r"^Shapes/magnet_": 2,
+        r"^Shapes/iron": 3,
     }
     for pattern, material_id in cases.items():
         if re.match(pattern, name, re.IGNORECASE):  # Case insensitive match
             return material_id
 
     raise ValueError(f"No material found for: name '{name}'")
+
+def name_to_body_force(name):
+    cases = {
+        r"^Shapes/magnet_1_0_0": 1,
+        r"^Shapes/magnet_-1_0_0": 2,
+        r"^Shapes/magnet_0_1_0": 3,
+        r"^Shapes/magnet_0_-1_0": 4,
+        r"^Shapes/magnet_0_0_1": 5,
+        r"^Shapes/magnet_0_0_-1": 6,
+    }
+    for pattern, body_force_id in cases.items():
+        if re.match(pattern, name, re.IGNORECASE):  # Case insensitive match
+            return body_force_id
+
+    return None
 
 def generate(config_data):
 

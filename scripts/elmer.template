@@ -10,7 +10,7 @@ Simulation
   Coordinate System = Cartesian
   Coordinate Mapping(3) = 1 2 3
   Simulation Type = Steady state
-  Steady State Max Iterations = 1
+  Steady State Max Iterations = 10
   Output Intervals(1) = 1
   Solver Input File = {{ config_file }}
   Post File = {{ result_file }}
@@ -25,62 +25,70 @@ Constants
   Unit Charge = 1.6021766e-19
 End
 
+Body Force 1
+  Magnetization 1 = Real 1.45
+  Magnetization 2 = Real 0
+  Magnetization 3 = Real 0
+End
+
+Body Force 2
+  Magnetization 1 = Real -1.45
+  Magnetization 2 = Real 0
+  Magnetization 3 = Real 0
+End
+
+Body Force 3
+  Magnetization 1 = Real 0
+  Magnetization 2 = Real 1.45
+  Magnetization 3 = Real 0
+End
+
+Body Force 4
+  Magnetization 1 = Real 0
+  Magnetization 2 = Real -1.45
+  Magnetization 3 = Real 0
+End
+
+Body Force 5
+  Magnetization 1 = Real 0
+  Magnetization 2 = Real 0
+  Magnetization 3 = Real 1.45
+End
+
+Body Force 6
+  Magnetization 1 = Real 0
+  Magnetization 2 = Real 0
+  Magnetization 3 = Real -1.45
+End
+
 Material 1
   Name = "Air"
   Relative Permeability = 1
+  Relative Permittivity = 1.0
 End
 
 Material 2
-  Name = "Magnet_1_0_0"
+  Name = "Magnet"
   Relative Permeability = 1.05
-  Magnetization 1 = 1160000
-  Magnetization 2 = 0
-  Magnetization 3 = 0
+  Relative Permittivity = 1.1
 End
 
 Material 3
-  Name = "Magnet_-1_0_0"
-  Relative Permeability = 1.05
-  Magnetization 1 = -1160000
-  Magnetization 2 = 0
-  Magnetization 3 = 0
-End
-
-Material 4
-  Name = "Magnet_0_1_0"
-  Relative Permeability = 1.05
-  Magnetization 1 = 0
-  Magnetization 2 = 1160000
-  Magnetization 3 = 0
-End
-
-Material 5
-  Name = "Magnet_0_-1_0"
-  Relative Permeability = 1.05
-  Magnetization 1 = 0
-  Magnetization 2 = -1160000
-  Magnetization 3 = 0
-End
-
-Material 6
-  Name = "Magnet_0_0_1"
-  Relative Permeability = 1.05
-  Magnetization 1 = 0
-  Magnetization 2 = 0
-  Magnetization 3 = 1160000
-End
-
-Material 7
-  Name = "Magnet_0_0_-1"
-  Relative Permeability = 1.05
-  Magnetization 1 = 0
-  Magnetization 2 = 0
-  Magnetization 3 = -1160000
-End
-
-Material 8
   Name = "Iron"
-  Relative Permeability = 2000
+  Relative Permittivity = 20
+  H-B Curve = Variable "soft_iron"
+    Real
+      0.0   0.0
+      0.02  50.0
+      0.05  200.0
+      0.1   500.0
+      0.2   1200.0
+      0.3   2000.0
+      0.5   4000.0
+      0.7   7000.0
+      1.0   12000.0
+      1.5  20000.0
+    End
 End
 
 {% for body in bodies %}
@@ -89,6 +97,9 @@ Body {{ body.id }}
   Name = "{{body.name}}"
   Equation = 1
   Material = {{body.material}}
+{% if body.body_force %}
+  Body Force = {{ body.body_force }}
+{% endif %}
 End
 {% endfor %}
 
@@ -119,8 +130,11 @@ End
 Solver 2
   Equation = MgDynPost
   Procedure = "MagnetoDynamics" "MagnetoDynamicsCalcFields"
-  Calculate Maxwell Stress = True
-  Calculate Magnetic Field Strength = True
+  Calculate Magnetic Vector Potential = Logical True
+  Calculate Magnetic Flux Density = Logical True
+  Calculate Maxwell Stress = Logical True
+  Calculate Magnetic Field Strength = Logical True
+  Calculate Nodal Forces = Logical True
   Exec Solver = Always
   Stabilize = True
   Optimize Bandwidth = True

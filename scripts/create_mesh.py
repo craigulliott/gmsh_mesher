@@ -290,13 +290,14 @@ def main():
                 name = gmsh.model.getEntityName(dim, tag)
                 print(f"Testing body {name} (ID {tag}): Material = '{0}' to elmer config")
                 material = elmer_config.name_to_material(name)
-                body = SimpleNamespace(name=name, id=tag, material=material)
+                body_force = elmer_config.name_to_body_force(name)
+                body = SimpleNamespace(name=name, id=tag, material=material, body_force=body_force)
                 bodies_for_elmer.append(body)
-                print(f"Added body {name} (ID {body.id}): Material = '{body.material}' to elmer config")
+                print(f"Added body {name} (ID {body.id}): Material = '{body.material}', Body Force = '{body.body_force}' to elmer config")
 
-            air_body = SimpleNamespace(name="Air", id=air_volume, material=elmer_config.name_to_material("Shapes/air"))
+            air_body = SimpleNamespace(name="Air", id=air_volume, material=elmer_config.name_to_material("Shapes/air"), body_force=None)
             bodies_for_elmer.append(air_body)
-            print(f"Added air (ID {air_body.id}): Material = '{air_body.material}' to elmer config")
+            print(f"Added air (ID {air_body.id}): Material = '{air_body.material}', Body Force = '{air_body.body_force}' to elmer config")
 
             # the surface tags for the air volume
             all_surfaces = gmsh.model.getEntities(dim=2)
