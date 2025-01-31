@@ -106,7 +106,7 @@ End
 Solver 1
   Equation = MgDyn
   Procedure = "MagnetoDynamics" "WhitneyAVSolver"
-  Exec Solver = Always
+  Exec Solver = Never ! Dont output the results from this solver, as they will be included in the output of solver 2 below
   Stabilize = True
   Optimize Bandwidth = True
   Steady State Convergence Tolerance = 1.0e-5

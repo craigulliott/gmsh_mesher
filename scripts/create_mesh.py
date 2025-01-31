@@ -80,21 +80,21 @@ def main():
         if args.draft:
             # a less fine mesh is desired
             print("Draft mode enabled")
-            auto_air_mesh_factor = 20
+            auto_air_mesh_factor = 25
 
         elif args.fine:
             # a very fine mesh is desired
             print("Fine mode enabled")
-            auto_air_mesh_factor = 40
+            auto_air_mesh_factor = 45
             # override refinement_factor (unless its been set manually)
             if args.refinement_factor == 0.02:
                 refinement_factor = 0.015
             # override refine_dist_max (unless its been set manually)
             if args.refine_dist_max == 40.0:
-                refinement_factor = 60.0
+                refine_dist_max = 60.0
 
         else:
-            auto_air_mesh_factor = 30
+            auto_air_mesh_factor = 35
 
         # --------------------------------------------------
 
