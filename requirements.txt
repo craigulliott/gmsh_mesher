@@ -1,4 +1,5 @@
 gmsh-sdk
-pytest
 argparse
 jinja2
+numpy
+pyvista
