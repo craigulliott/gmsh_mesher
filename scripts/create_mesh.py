@@ -1,77 +1,9 @@
 import os
 import argparse
 import gmsh
-import re
-
-def is_iges_file(file_path):
-    try:
-        with open(file_path, 'r', encoding='utf-8') as file:
-            first_line = file.readline().strip()
-            # Check if the file starts with 'S' followed by spaces and a number
-            return first_line.startswith("S") and first_line[1:].strip().isdigit()
-    except Exception as e:
-        print(f"Error reading file: {e}")
-        return False
-
-# for parsing IGES files
-def decode_hollerith(s):
-    """
-    If 's' matches the pattern nH..., decode as a Hollerith string.
-    Otherwise return s unchanged.
-    """
-    match = re.match(r'^(\d+)H(.*)', s)
-    if match:
-        length = int(match.group(1))
-        return match.group(2)[:length]
-    return s
-
-# return the units from an IGES file
-def get_iges_units(filename):
-    """
-    Parses an IGES file to extract the units name from its Global Section.
-    Returns a tuple: (units_flag, units_name), where units_flag is the
-    numeric code and units_name is the textual representation.
-    """
-    with open(filename, 'r', encoding='utf-8', errors='ignore') as f:
-        lines = f.readlines()
-
-    # 1) Collect the Global Section lines (marked 'G' in column 73)
-    global_lines = []
-    for line in lines:
-        # Ensure line is at least 73 chars and check the flag in column 73 (index 72)
-        if len(line) >= 73 and line[72] == 'G':
-            # Keep only the first 72 characters (ASCII data) ignoring columns 73-80
-            global_lines.append(line[:72])
-
-    # 2) Concatenate Global Section lines into one string
-    #    (They form a single “record” logically)
-    global_data = ''.join(global_lines)
-
-    if not global_data:
-        raise ValueError("No Global Section found (no lines with 'G' flag).")
-
-    # 3) The first character is the parameter delimiter (e.g. ',')
-    #    The second character is the record delimiter (e.g. ';')
-    param_delimiter  = global_data[0]
-    record_delimiter = global_data[1]
-
-    # 4) Sometimes the Global Section is also split by the record delimiter,
-    #    but often there's only one record. We'll split by the param_delimiter
-    #    to get the parameter fields. (If the file uses record_delimiter in
-    #    between, you may need to re-concatenate or handle carefully.)
-    #    For simplicity, assume the entire global_data is one record we can
-    #    split by param_delimiter.
-
-    # Strip off the first two characters (param_delim + record_delim)
-    # before splitting, as they are not part of the actual fields.
-    # Then split on the param_delimiter.
-    fields = global_data[2:].split(param_delimiter)
-
-    # Make sure we have enough fields
-    if len(fields) < 15:
-        raise ValueError("Global Section does not have enough fields to extract units.")
-
-    return decode_hollerith(fields[12].strip())
+import elmer_config
+import iges
+from types import SimpleNamespace
 
 def main():
     try:
@@ -81,7 +13,10 @@ def main():
 
         # ---------------- Parse Arguments ----------------
         parser = argparse.ArgumentParser(description="Generate a mesh from an input IGES file.")
-        parser.add_argument("input_file", type=str, help="Path to the input IGES file.")
+        parser.add_argument(
+            "--input_file", type=str, default='model.iges',
+            help="Path to the input IGES file. (default: model.iges)."
+        )
         parser.add_argument(
             "--air_mesh_size", type=float, default=0,
             help="Default element size in MM for the air volume where it is not near bodies (default: calculated automatically based on the total air volume)."
@@ -111,13 +46,31 @@ def main():
             help="If true, default values will be chosen that result in a very fine mesh (default: false)."
         )
         parser.add_argument(
-            "--output_file", type=str, default="final_mesh.msh",
-            help="Path to the output mesh file (default: final_mesh.msh)."
+            "--multi_thread", action='store_true',
+            help="If true, mesh will be created with multiple threads. This algorithm will result in slightly a slightly different mesh each time."
+        )
+        parser.add_argument(
+            "--output_file", type=str, default="mesh.msh",
+            help="Path to the output mesh file (default: mesh.msh)."
+        )
+        parser.add_argument(
+            "--elmer_config_file", type=str, default="case.sif",
+            help="Path to the output elmer script file (default: case.sif)."
+        )
+        parser.add_argument(
+            "--elmer_result_file", type=str, default="case.vtu",
+            help="Path to the elmer simulation result (default: case.vtu)."
+        )
+        parser.add_argument(
+            "--generate_elmer_files", action='store_true',
+            help="If true, will generate elmer script and ELMERSOLVER_STARTINFO file."
         )
         args = parser.parse_args()
 
         input_file = args.input_file
         output_file = args.output_file
+        elmer_config_file = args.elmer_config_file
+        elmer_result_file = args.elmer_result_file
         air_box_padding = args.air_box_padding
         air_mesh_size = args.air_mesh_size
         refinement_factor = args.refinement_factor
@@ -132,23 +85,34 @@ def main():
         elif args.fine:
             # a very fine mesh is desired
             print("Fine mode enabled")
-            auto_air_mesh_factor = 70
-            # override (unless its been set manually)
+            auto_air_mesh_factor = 40
+            # override refinement_factor (unless its been set manually)
             if args.refinement_factor == 0.02:
                 refinement_factor = 0.015
+            # override refine_dist_max (unless its been set manually)
+            if args.refine_dist_max == 40.0:
+                refinement_factor = 60.0
 
         else:
-            auto_air_mesh_factor = 50
+            auto_air_mesh_factor = 30
 
         # --------------------------------------------------
+
+        if args.multi_thread:
+            print("Default number of threads used:", gmsh.option.getNumber("General.NumThreads"))
+            cores = os.cpu_count()
+            print(f"Number of logical processors (cores) on this machine: {cores}")
+            if cores > 2:
+                gmsh.option.setNumber("General.NumThreads", cores - 1)
+                print(f"Number of threads set to {cores - 1}")
 
         if not os.path.exists(input_file):
             raise FileNotFoundError(f"Input IGES file not found: {input_file}")
 
-        if not is_iges_file(input_file):
-            raise FileNotFoundError(f"Input file did not appear to be an IGES file")
+        if not iges.is_iges_file(input_file):
+            raise FileNotFoundError(f"Input file did not appear to be a IGES file")
 
-        unit_name = get_iges_units(input_file)
+        unit_name = iges.get_iges_units(input_file)
 
         print(f"IGES File Units Name: {unit_name}")
         if unit_name == "MM":
@@ -161,6 +125,7 @@ def main():
             raise FileNotFoundError(f"Expected units to be MM, but IGES file is using unexpected units: {unit_name}")
 
         # Load the IGES file
+        gmsh.option.setNumber("Geometry.OCCImportLabels", 1)
         gmsh.model.occ.importShapes(input_file)
         gmsh.model.occ.synchronize()
 
@@ -191,14 +156,6 @@ def main():
             scaled_xmin, scaled_ymin, scaled_zmin, scaled_xmax, scaled_ymax, scaled_zmax = gmsh.model.getBoundingBox(-1, -1)
             print(f"New bounding box dimensions (meters): x {scaled_xmin:.4f}, {scaled_xmax:.4f}, y {scaled_ymin:.4f}, {scaled_ymax:.4f}, z {scaled_zmin:.4f}, {scaled_zmax:.4f}")
 
-        print("Default number of threads used:", gmsh.option.getNumber("General.NumThreads"))
-        cores = os.cpu_count()
-        print(f"Number of logical processors (cores) on this machine: {cores}")
-        if cores > 2:
-            gmsh.option.setNumber("General.NumThreads", cores - 1)
-            print(f"Number of threads set to {cores - 1}")
-
-
         # Synchronize the model to apply transformations
         gmsh.model.occ.synchronize()
 
@@ -219,7 +176,6 @@ def main():
         gmsh.option.setNumber("Geometry.ToleranceBoolean", 1e-6)
 
         # Use 2nd-order elements to capture field gradients more accurately.
-        # Disabled until we figure out how to configure elmer to handle them
         # gmsh.option.setNumber("Mesh.ElementOrder", 2)
 
         # Enable mesh optimization to reduce skewness and improve element shapes
@@ -325,6 +281,44 @@ def main():
         print(f"Saving to {output_file}")
         gmsh.write(output_file)
         print(f"Mesh saved")
+
+        if args.generate_elmer_files:
+            # generate the elmer configuration
+            print("Generating elmer config")
+            bodies_for_elmer = []
+            for dim, tag in object_volumes:
+                name = gmsh.model.getEntityName(dim, tag)
+                print(f"Testing body {name} (ID {tag}): Material = '{0}' to elmer config")
+                material = elmer_config.name_to_material(name)
+                body = SimpleNamespace(name=name, id=tag, material=material)
+                bodies_for_elmer.append(body)
+                print(f"Added body {name} (ID {body.id}): Material = '{body.material}' to elmer config")
+
+            air_body = SimpleNamespace(name="Air", id=air_volume, material=elmer_config.name_to_material("Shapes/air"))
+            bodies_for_elmer.append(air_body)
+            print(f"Added air (ID {air_body.id}): Material = '{air_body.material}' to elmer config")
+
+            # the surface tags for the air volume
+            all_surfaces = gmsh.model.getEntities(dim=2)
+            # the last 6 positions in the list (not zero indexed)are the outer surface of the air volume
+            air_boundary_surface_ids = list(range(len(all_surfaces) - 5, len(all_surfaces) + 1))
+            air_boundaries = " ".join(map(str, air_boundary_surface_ids))
+
+            elmer_config_result = elmer_config.generate({
+                "bodies": bodies_for_elmer,
+                "air_boundaries": air_boundaries,
+                "config_file": elmer_config_file,
+                "result_file": elmer_result_file,
+            })
+
+            # Write elmer script to a file
+            with open(elmer_config_file, "w") as f:
+                f.write(elmer_config_result)
+
+            # Create ELMERSOLVER_STARTINFO
+            with open('ELMERSOLVER_STARTINFO', "w") as f:
+                f.write(f"{elmer_config_file}\n1\n")
+
 
     except Exception as e:
         print(f"Error: {e}")

@@ -1,2 +1,4 @@
 gmsh-sdk
 pytest
+argparse
+jinja2

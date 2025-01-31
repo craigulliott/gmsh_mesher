@@ -41,10 +41,21 @@ python scripts/create_mesh.py ~/Downloads/many_magnets.iges --output_file /tmp/m
 python scripts/create_mesh.py --help
 ```
 
-Run tests:
+## Full simulation workflow
+
+For this workflow to function correctly, each body must be assigned a name corresponding to its material. The materials should be defined in scripts/elmer.template, and a mapping should be created in scripts/elmer_config.py. This setup currently works for me in Fusion 360, but if you’re using a different CAD software, you may need to adjust the regular expressions or modify the script to match your software’s output.
+
+For example, my bodies in fusion 360 might be called "iron (1)", "iron (2)" and two magnets with opposing fields on the Y axis might be called "magnet_0_1_0 (1)" and "magnet_0_-1_0 (1)".
 
 ```bash
-pytest tests/
+# Generate mesh.msh from model.iges, and generate elmer scripts
+python ../scripts/create_mesh.py --generate_elmer_files true
+
+# Convert mesh.msh into elmer mesh format and place files in ./mesh
+ElmerGrid 14 2 mesh.msh -autoclean
+
+# Run the elmer solver and place the result in ./results
+ElmerSolver
 ```
 
 ## Elmer

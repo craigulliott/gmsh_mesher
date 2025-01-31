@@ -1,0 +1,154 @@
+Header
+  CHECK KEYWORDS Warn
+  Mesh DB "." "mesh"
+  Include Path ""
+  Results Directory "results"
+End
+
+Simulation
+  Max Output Level = 5
+  Coordinate System = Cartesian
+  Coordinate Mapping(3) = 1 2 3
+  Simulation Type = Steady state
+  Steady State Max Iterations = 1
+  Output Intervals(1) = 1
+  Solver Input File = {{ config_file }}
+  Post File = {{ result_file }}
+End
+
+Constants
+  Gravity(4) = 0 -1 0 9.82
+  Stefan Boltzmann = 5.670374419e-08
+  Permittivity of Vacuum = 8.85418781e-12
+  Permeability of Vacuum = 1.25663706e-6
+  Boltzmann Constant = 1.380649e-23
+  Unit Charge = 1.6021766e-19
+End
+
+Material 1
+  Name = "Air"
+  Relative Permeability = 1
+End
+
+Material 2
+  Name = "Magnet_1_0_0"
+  Relative Permeability = 1.05
+  Magnetization 1 = 1160000
+  Magnetization 2 = 0
+  Magnetization 3 = 0
+End
+
+Material 3
+  Name = "Magnet_-1_0_0"
+  Relative Permeability = 1.05
+  Magnetization 1 = -1160000
+  Magnetization 2 = 0
+  Magnetization 3 = 0
+End
+
+Material 4
+  Name = "Magnet_0_1_0"
+  Relative Permeability = 1.05
+  Magnetization 1 = 0
+  Magnetization 2 = 1160000
+  Magnetization 3 = 0
+End
+
+Material 5
+  Name = "Magnet_0_-1_0"
+  Relative Permeability = 1.05
+  Magnetization 1 = 0
+  Magnetization 2 = -1160000
+  Magnetization 3 = 0
+End
+
+Material 6
+  Name = "Magnet_0_0_1"
+  Relative Permeability = 1.05
+  Magnetization 1 = 0
+  Magnetization 2 = 0
+  Magnetization 3 = 1160000
+End
+
+Material 7
+  Name = "Magnet_0_0_-1"
+  Relative Permeability = 1.05
+  Magnetization 1 = 0
+  Magnetization 2 = 0
+  Magnetization 3 = -1160000
+End
+
+Material 8
+  Name = "Iron"
+  Relative Permeability = 2000
+End
+
+{% for body in bodies %}
+Body {{ body.id }}
+  Target Bodies(1) = {{ body.id }}
+  Name = "{{body.name}}"
+  Equation = 1
+  Material = {{body.material}}
+End
+{% endfor %}
+
+Solver 1
+  Equation = MgDyn
+  Procedure = "MagnetoDynamics" "WhitneyAVSolver"
+  Exec Solver = Always
+  Stabilize = True
+  Optimize Bandwidth = True
+  Steady State Convergence Tolerance = 1.0e-5
+  Nonlinear System Convergence Tolerance = 1.0e-7
+  Nonlinear System Max Iterations = 20
+  Nonlinear System Newton After Iterations = 3
+  Nonlinear System Newton After Tolerance = 1.0e-3
+  Nonlinear System Relaxation Factor = 1
+  Linear System Solver = Iterative
+  Linear System Iterative Method = BiCGStab
+  Linear System Max Iterations = 500
+  Linear System Convergence Tolerance = 1.0e-10
+  BiCGstabl polynomial degree = 2
+  Linear System Preconditioning = ILU0
+  Linear System ILUT Tolerance = 1.0e-3
+  Linear System Abort Not Converged = False
+  Linear System Residual Output = 10
+  Linear System Precondition Recompute = 1
+End
+
+Solver 2
+  Equation = MgDynPost
+  Procedure = "MagnetoDynamics" "MagnetoDynamicsCalcFields"
+  Calculate Maxwell Stress = True
+  Calculate Magnetic Field Strength = True
+  Exec Solver = Always
+  Stabilize = True
+  Optimize Bandwidth = True
+  Steady State Convergence Tolerance = 1.0e-5
+  Nonlinear System Convergence Tolerance = 1.0e-7
+  Nonlinear System Max Iterations = 20
+  Nonlinear System Newton After Iterations = 3
+  Nonlinear System Newton After Tolerance = 1.0e-3
+  Nonlinear System Relaxation Factor = 1
+  Linear System Solver = Iterative
+  Linear System Iterative Method = BiCGStab
+  Linear System Max Iterations = 500
+  Linear System Convergence Tolerance = 1.0e-10
+  BiCGstabl polynomial degree = 2
+  Linear System Preconditioning = ILU0
+  Linear System ILUT Tolerance = 1.0e-3
+  Linear System Abort Not Converged = False
+  Linear System Residual Output = 10
+  Linear System Precondition Recompute = 1
+End
+
+Equation 1
+  Name = "MgDyn"
+  Active Solvers(2) = 1 2
+End
+
+Boundary Condition 1
+  Target Boundaries(6) = {{air_boundaries}}
+  Name = "BoundaryCondition 1"
+  AV {e} = 0
+End
