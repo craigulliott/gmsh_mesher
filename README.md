@@ -49,7 +49,7 @@ For example, my bodies in fusion 360 might be called "iron (1)", "iron (2)" and 
 
 ```bash
 # Generate mesh.msh from model.iges, and generate elmer scripts
-python ../scripts/create_mesh.py --generate_elmer_files true
+python ../scripts/create_mesh.py --generate_elmer_files
 
 # Convert mesh.msh into elmer mesh format and place files in ./mesh
 ElmerGrid 14 2 mesh.msh -autoclean
